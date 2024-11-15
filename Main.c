@@ -66,13 +66,23 @@ int main() {
         printf("3. Generar un Número Aleatorio\n");
         printf("4. Salir\n");
         printf("Elige una opción: ");
-        scanf("%d", &choice);
+        
+        while (scanf("%d", &choice) != 1) {
+            printf("Error: Por favor, introduce un número válido.\n");
+            while (getchar() != '\n');
+            printf("Elige una opción: ");
+        }
 
         switch (choice) {
             case 1: {
                 int decimal;
                 printf("Introduce un número decimal: ");
-                scanf("%d", &decimal);
+                
+                while (scanf("%d", &decimal) != 1) {
+                    printf("Error: Por favor, introduce un número decimal válido.\n");
+                    while (getchar() != '\n');
+                    printf("Introduce un número decimal: ");
+                }
 
                 if (decimal < 0) {
                     printf("Error: el número debe ser positivo.\n");
@@ -84,22 +94,35 @@ int main() {
                 break;
             }
             case 2: {
-                char binary[9];
-                printf("Introduce un número binario de 8 bits: ");
+            char binary[9];
+            printf("Introduce un número binario de 8 bits: ");
+            
+            while (1) {
                 scanf("%s", binary);
                 
-                int decimal = binaryToDecimal(binary);
-                if (decimal != -1) {
-                    printf("Decimal: %d\n", decimal);
+                while (getchar() != '\n');
+
+                if (strlen(binary) == 8) {
+                    break;
+                } else {
+                    printf("Error: Debes ingresar un número binario de exactamente 8 bits.\n");
+                    printf("Introduce un número binario de 8 bits: ");
                 }
-                break;
             }
+
+            int decimal = binaryToDecimal(binary);
+            if (decimal != -1) {
+                printf("Decimal: %d\n", decimal);
+            }
+            break;
+        }
+
             case 3: {
                 generateRandomNumber();
                 break;
             }
             case 4:
-                printf("Saliendo del programa.\n");
+                printf("Saliendo del programa...\n");
                 break;
             default:
                 printf("Opción no válida. Por favor, elige una opción del menú.\n");
