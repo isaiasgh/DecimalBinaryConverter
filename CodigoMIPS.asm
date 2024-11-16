@@ -9,9 +9,11 @@ input_decimal_msg: .asciiz "Introduce un número decimal: "
 input_binary_msg: .asciiz "Introduce un número binario de 8 bits: "
 binary_result_msg: .asciiz "Binario: "
 decimal_result_msg: .asciiz "\nDecimal: "
+error_msg:          .asciiz "Error: entrada inválida.\n"
 random_msg: .asciiz "Número aleatorio generado: "
 error_invalid_decimal: .asciiz "Error: El número debe estar entre 0 y 255.\n"
 error_invalid_binary: .asciiz "Error: El número binario debe tener exactamente 8 bits.\n"
+invalid_option_msg: .asciiz "Opción no válida. Por favor, elige una opción del menú.\n"
 exit_msg: .asciiz "Saliendo del programa...\n"
 
 .text
@@ -36,7 +38,7 @@ main_loop:
 
     # Opción inválida
     li $v0, 4
-    la $a0, error_invalid_binary
+    la $a0, invalid_option_msg
     syscall
     j main_loop
 
@@ -91,7 +93,7 @@ invalid_decimal:
 binary_to_decimal:
     # Imprimir mensaje solicitando el número binario
     li $v0, 4
-    la $a0, binary_result_msg
+    la $a0, input_binary_msg
     syscall
 
     # Leer cadena binaria desde el usuario
@@ -187,7 +189,7 @@ invalid_range:
     la $a0, error_invalid_range
     syscall
     j main_loop                     # Regresar al menú principal
-    
+
 # Salir del Programa
 exit_program:
     li $v0, 4
