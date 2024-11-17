@@ -1,7 +1,7 @@
 .data
 binary_input: .space 9          # Espacio para leer hasta 8 bits más el terminador nulo '\0'
+binary_array: .space 8           # Espacio para almacenar 8 bits
 newline_msg: .asciiz "\n"
-error_invalid_range: .asciiz "Error: El rango para el número aleatorio no es válido.\n"
 
 # Mensajes de texto
 menu_msg: .asciiz "\n--- Conversor Decimal-Binario ---\n1. Convertir Decimal a Binario\n2. Convertir Binario a Decimal (8 bits)\n3. Generar un Número Aleatorio\n4. Salir\nElige una opción: "
@@ -45,49 +45,69 @@ main_loop:
 # Convertir Decimal a Binario
 decimal_to_binary:
     # Si $t1 ya contiene un número válido, saltar a la conversión
-    bgez $t1, start_conversion     # Si $t1 >= 0, saltar a la conversión
-
+    bgtz $t1, start_convertion     # Si $t1 > 0, saltar a la conversión
+    
     # Solicitar un número decimal al usuario
-    li $v0, 4
+    li $v0, 4                      # Syscall para imprimir mensaje
     la $a0, input_decimal_msg
     syscall
 
-    li $v0, 5                      # Leer número decimal
+    li $v0, 5                      # Syscall para leer un número entero
     syscall
-    move $t1, $v0                  # Guardar en $t1
+    move $t1, $v0                  # Guardar número decimal en $t1
 
-    # Validar rango
-    blt $t1, 0, invalid_decimal
-    bgt $t1, 255, invalid_decimal
+    # Validar que el número esté en el rango 0-255
+    blt $t1, 0, invalid_decimal    # Si $t1 < 0, mostrar error
+    bgt $t1, 255, invalid_decimal  # Si $t1 > 255, mostrar error
 
-start_conversion:
-    # Convertir $t1 a binario
-    li $t2, 0                      # Contador de bits
-    li $t3, 8                      # Máximo 8 bits
-    la $a0, binary_result_msg      # Imprimir texto
-    li $v0, 4
+start_convertion:
+    # Mensaje inicial para el binario
+    li $v0, 4                      # Syscall para imprimir mensaje
+    la $a0, binary_result_msg
     syscall
+
+    # Preparar para la conversión a binario
+    li $t2, 8                      # Número de bits (siempre 8 bits)
+    la $t5, binary_array           # Apuntar al array donde se guardarán los bits
+    addi $t5, $t5, 7               # Apuntar al último espacio del array (orden inverso)
 
 convert_to_binary:
-    beq $t2, $t3, print_binary     # Fin si contador alcanza 8
-    div $t1, $t1, 2                # División
-    mfhi $t4                       # Resto (bit actual)
-    li $v0, 1                      # Imprimir bit
-    move $a0, $t4
-    syscall
-    addi $t2, $t2, 1               # Incrementar contador
-    j convert_to_binary
+    beqz $t2, print_binary         # Si se procesaron 8 bits, terminar la conversión
+    div $t1, $t1, 2                # Dividir número decimal entre 2
+    mfhi $t4                       # Obtener el bit menos significativo (resto)
+    sb $t4, 0($t5)                 # Guardar el bit en el array
+    addi $t5, $t5, -1              # Mover al espacio anterior del array
+    mflo $t1                       # Actualizar $t1 con el cociente
+    subi $t2, $t2, 1               # Decrementar el contador de bits
+    j convert_to_binary            # Continuar la conversión
 
 print_binary:
-    # Limpiar $t1 después de la conversión
-    li $t1, -1
+    # Imprimir los bits en orden correcto
+    la $t5, binary_array           # Volver al inicio del array
+    li $t2, 8                      # Reiniciar contador a 8 bits
+
+print_binary_loop:
+    beqz $t2, end_conversion       # Si se imprimieron todos los bits, terminar
+    lb $t4, 0($t5)                 # Cargar un bit del array
+    addi $t4, $t4, 48              # Convertir 0/1 a ASCII ('0' o '1')
+    li $v0, 11                     # Syscall para imprimir carácter
+    move $a0, $t4
+    syscall
+    addi $t5, $t5, 1               # Mover al siguiente bit en el array
+    subi $t2, $t2, 1               # Decrementar el contador de bits
+    j print_binary_loop            # Continuar imprimiendo
+
+end_conversion:
+    # Volver al menú principal
     j main_loop
 
 invalid_decimal:
+    # Mensaje de error si el número no está en el rango permitido
     li $v0, 4
     la $a0, error_invalid_decimal
     syscall
     j main_loop
+
 
 # Convertir Binario a Decimal
 binary_to_decimal:
@@ -105,6 +125,7 @@ binary_to_decimal:
     # Validar longitud de la entrada (debe ser exactamente 8 bits)
     la $t1, binary_input           # Cargar dirección del buffer
     li $t2, 0                      # Contador de longitud
+    
 validate_length:
     lb $t3, 0($t1)                 # Leer un byte de la cadena
     beqz $t3, convert_to_decimal   # Si es nulo ('\0'), salir del bucle
@@ -126,6 +147,7 @@ binary_conversion_loop:
     sub $t3, $t3, 48               # Convertir carácter ('0' o '1') a valor numérico
     beqz $t3, skip_add             # Si es 0, omitir la suma
     add $t4, $t4, $t5              # Sumar la potencia de 2 al acumulador
+    
 skip_add:
     srl $t5, $t5, 1                # Dividir la base por 2 (desplazamiento a la derecha)
     addi $t1, $t1, 1               # Avanzar al siguiente carácter
@@ -151,44 +173,33 @@ print_decimal:
 
 # Generar un Número Aleatorio entre 10 y 50
 generate_random:
-    li $t0, 10                     # Valor mínimo (10)
-    li $t1, 41                     # Rango (50 - 10 + 1)
+ # Configurar el rango de números aleatorios
+    li $v0, 42             # Syscall para random int range
+    li $a0, 1              # ID del generador (puedes usar cualquier valor)
+    li $a1, 41             # Rango (50 - 10 + 1)
+    syscall                # Generar el número aleatorio en $a0
 
-    # Asegurar que el rango no sea negativo
-    blez $t1, invalid_range         # Si el rango no es positivo, mostrar error
+    addi $a0, $a0, 10      # Ajustar al rango [10, 50]
+    move $t2, $a0          # Guardar el número generado en $t2
 
-    # Configurar rango para syscall 42
-    li $v0, 42                      # Syscall rand
-    move $a1, $t1                   # Establecer rango en $a1
-    syscall
-
-    # Ajustar número al rango 10-50
-    rem $t2, $v0, $t1               # Resto para obtener un número dentro del rango
-    add $t2, $t2, $t0               # Ajustar el resultado al mínimo (10)
-
-    # Mostrar número aleatorio generado
-    li $v0, 4
+    # Imprimir el número aleatorio generado
+    li $v0, 4              # Syscall para imprimir mensaje
     la $a0, random_msg
     syscall
 
-    li $v0, 1
-    move $a0, $t2                   # Imprimir número aleatorio
+    li $v0, 1              # Syscall para imprimir el número
+    move $a0, $t2          # Número aleatorio en $t2
     syscall
 
-    # Salto de línea después de imprimir
+    # Salto de línea
     li $v0, 4
     la $a0, newline_msg
     syscall
 
-    # Convertir el número aleatorio a binario
-    move $t1, $t2                   # Guardar el número generado en $t1
-    j decimal_to_binary             # Saltar a la función de conversión
-    
-invalid_range:
-    li $v0, 4
-    la $a0, error_invalid_range
-    syscall
-    j main_loop                     # Regresar al menú principal
+    # Llamar a la función decimal_to_binary
+    move $t1, $t2          # Pasar el número generado en $t2 a $a0
+    j decimal_to_binary  # Llamar a la función
+
 
 # Salir del Programa
 exit_program:
